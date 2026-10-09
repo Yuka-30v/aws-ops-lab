@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      BUCKET: yuka-gega-lab-site-2026
+      BUCKET: yuka-gega-lab-site-WRONG
       AWS_REGION: eu-west-1
     steps:
       - name: Check out code
