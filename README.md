@@ -4,6 +4,15 @@ Hands-on lab covering first-line cloud operations on AWS (eu-west-1): Linux and 
 administration on EC2, security group troubleshooting, CloudWatch alerting with an escalation
 runbook, and a GitHub Actions CI/CD pipeline to Amazon S3.
 
+**Skills shown:** EC2 (Linux and Windows) · security groups · IAM least privilege · CloudWatch and SNS · runbooks and escalation · Git and GitHub Actions · S3 static hosting · structured troubleshooting
+
+## What I built
+
+- **Linux:** Amazon Linux 2023 on EC2 with nginx; patched with dnf; managed with systemctl and journalctl
+- **Windows:** Windows Server 2025 on EC2 via RDP; Event Viewer, Services, local users and groups, PowerShell
+- **Monitoring:** CloudWatch alarm (CPU > 70% over 5 minutes) with SNS email alerts and a runbook ([RB-001](runbooks/RB-001-high-cpu.md))
+- **CI/CD:** GitHub Actions pipeline that deploys to an S3 static website on every push, with a smoke test
+
 ## Architecture
 
 ```mermaid
@@ -18,16 +27,6 @@ flowchart LR
   CW --> SNS[SNS email]
 ```
 
-## What I built
-
-- **Linux:** Amazon Linux 2023 on EC2 with nginx; patched with dnf; managed with systemctl and journalctl
-- **Windows:** Windows Server 2025 on EC2 via RDP; Event Viewer, Services, local users and groups, PowerShell
-- **Monitoring:** CloudWatch alarm (CPU > 70% over 5 minutes) with SNS email alerts and a runbook ([RB-001](runbooks/RB-001-high-cpu.md))
-- **CI/CD:** GitHub Actions pipeline that deploys to an S3 static website on every push, with a smoke test
-
-![EC2 instance running](screenshots/01-ec2-running.png)
-![Windows Server 2025](screenshots/05-windows-server.png)
-
 ## Troubleshooting cases
 
 | # | Symptom | How I diagnosed it | Root cause | Fix |
@@ -40,24 +39,77 @@ flowchart LR
 | 6 | Pipeline job stuck in "Queued" | Checked githubstatus.com before changing anything | GitHub Actions outage (runner assignment delays) | Waited, no config changes; run #1 completed after the incident |
 | 7 | Pipeline failed (red x) | Credentials step passed, so the keys were valid; the upload step logged `NoSuchBucket` | Deliberate test: wrong bucket name in deploy.yml | Corrected the bucket name and pushed again |
 
-![Timeout](screenshots/02-sg-timeout.png)
-![nginx working](screenshots/03-nginx-ok.png)
-![Connection refused](screenshots/04-service-refused.png)
+## Key evidence
 
-## Monitoring: alarm fired and recovered
+<p>
+  <img src="screenshots/08-alarm-full-cycle.png" width="650" alt="CloudWatch alarm full cycle">
+  <br>
+  <em>CloudWatch alarm cycle: OK, then In alarm when CPU hit 100%, then back to OK after I stopped the load.</em>
+</p>
 
-Two `yes` processes pushed both vCPUs to 100%. The alarm moved from OK to In alarm, sent an
-email through SNS, and returned to OK after I stopped the load.
+<p>
+  <img src="screenshots/10-pipeline-history.png" width="650" alt="GitHub Actions run history">
+  <br>
+  <em>Pipeline history: #1 slowed by a GitHub outage (10m 40s), #2 auto-deployed version 2, #3 deliberate failure, #4 fixed.</em>
+</p>
 
-![CPU load in top](screenshots/06-cpu-load-top.png)
-![Alarm in alarm](screenshots/07-alarm-in-alarm.png)
-![Full alarm cycle](screenshots/08-alarm-full-cycle.png)
+## More screenshots
 
-## CI/CD: push to deploy
+<details>
+<summary><strong>Linux: security group and service troubleshooting (cases 1 and 2)</strong></summary>
+<br>
+<p>
+  <img src="screenshots/01-ec2-running.png" width="650" alt="EC2 instance running">
+  <br><em>Amazon Linux instance running in eu-west-1a, all status checks passed.</em>
+</p>
+<p>
+  <img src="screenshots/02-sg-timeout.png" width="450" alt="Connection timed out">
+  <br><em>Case 1: timeout, because the security group had no rule for port 80.</em>
+</p>
+<p>
+  <img src="screenshots/03-nginx-ok.png" width="450" alt="nginx welcome page">
+  <br><em>After adding the HTTP rule (my IP only), nginx is reachable.</em>
+</p>
+<p>
+  <img src="screenshots/04-service-refused.png" width="450" alt="Connection refused">
+  <br><em>Case 2: connection refused, because nginx was stopped. Traffic reached the server, but nothing was listening.</em>
+</p>
+</details>
 
-![Site version 2](screenshots/09-site-v2.png)
-![Pipeline history](screenshots/10-pipeline-history.png)
-![Pipeline failure log](screenshots/11-pipeline-failure.png)
+<details>
+<summary><strong>Windows Server 2025</strong></summary>
+<br>
+<p>
+  <img src="screenshots/05-windows-server.png" width="650" alt="Windows Server 2025 desktop over RDP">
+  <br><em>Windows Server 2025 over RDP (access limited to my IP), used for Event Viewer, Services, local users and network checks.</em>
+</p>
+</details>
+
+<details>
+<summary><strong>CloudWatch alarm test</strong></summary>
+<br>
+<p>
+  <img src="screenshots/06-cpu-load-top.png" width="550" alt="top showing two yes processes at 100% CPU">
+  <br><em>Two <code>yes</code> processes pushed both vCPUs of the t3.micro to 100%.</em>
+</p>
+<p>
+  <img src="screenshots/07-alarm-in-alarm.png" width="650" alt="Alarm in alarm state">
+  <br><em>CPU crossed the 70% threshold and the alarm moved to In alarm, sending an SNS email.</em>
+</p>
+</details>
+
+<details>
+<summary><strong>CI/CD pipeline</strong></summary>
+<br>
+<p>
+  <img src="screenshots/09-site-v2.png" width="450" alt="Site showing version 2">
+  <br><em>Changing one line and pushing updated the live S3 site to version 2 automatically.</em>
+</p>
+<p>
+  <img src="screenshots/11-pipeline-failure.png" width="650" alt="Pipeline failure log">
+  <br><em>Case 7: the credentials step passed and the upload step failed with NoSuchBucket, which narrowed the cause to the bucket name.</em>
+</p>
+</details>
 
 ## Security choices
 
